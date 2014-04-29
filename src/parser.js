@@ -20,6 +20,8 @@
         r:                    'radius',
         cy:                   'top',
         y:                    'top',
+        display:              'visible',
+        visibility:           'visible',
         transform:            'transformMatrix',
         'fill-opacity':       'fillOpacity',
         'fill-rule':          'fillRule',
@@ -33,7 +35,8 @@
         'stroke-miterlimit':  'strokeMiterLimit',
         'stroke-opacity':     'strokeOpacity',
         'stroke-width':       'strokeWidth',
-        'text-decoration':    'textDecoration'
+        'text-decoration':    'textDecoration',
+        'text-anchor':        'originX'
       },
 
       colorAttributes = {
@@ -69,6 +72,16 @@
       else {
         value = fabric.parseTransformAttribute(value);
       }
+    }
+    else if (attr === 'visible') {
+      value = (value === 'none' || value === 'hidden') ? false : true;
+      // display=none on parent element always takes precedence over child element
+      if (parentAttributes.visible === false) {
+        value = false;
+      }
+    }
+    else if (attr === 'originX' /* text-anchor */) {
+      value = value === 'start' ? 'left' : value === 'end' ? 'right' : 'center';
     }
 
     isArray = Object.prototype.toString.call(value) === '[object Array]';
@@ -271,7 +284,7 @@
       oStyle.fontStyle = fontStyle;
     }
     if (fontWeight) {
-      oStyle.fontSize = isNaN(parseFloat(fontWeight)) ? fontWeight : parseFloat(fontWeight);
+      oStyle.fontWeight = isNaN(parseFloat(fontWeight)) ? fontWeight : parseFloat(fontWeight);
     }
     if (fontSize) {
       oStyle.fontSize = parseFloat(fontSize);
@@ -410,27 +423,37 @@
       if (!elements || (elements && !elements.length)) return;
 
       var viewBoxAttr = doc.getAttribute('viewBox'),
-          widthAttr = doc.getAttribute('width'),
-          heightAttr = doc.getAttribute('height'),
+          widthAttr = parseFloat(doc.getAttribute('width')),
+          heightAttr = parseFloat(doc.getAttribute('height')),
           width = null,
           height = null,
+          viewBoxWidth,
+          viewBoxHeight,
           minX,
           minY;
 
       if (viewBoxAttr && (viewBoxAttr = viewBoxAttr.match(reViewBoxAttrValue))) {
-        minX = parseInt(viewBoxAttr[1], 10);
-        minY = parseInt(viewBoxAttr[2], 10);
-        width = parseInt(viewBoxAttr[3], 10);
-        height = parseInt(viewBoxAttr[4], 10);
+        minX = parseFloat(viewBoxAttr[1]);
+        minY = parseFloat(viewBoxAttr[2]);
+        viewBoxWidth = parseFloat(viewBoxAttr[3]);
+        viewBoxHeight = parseFloat(viewBoxAttr[4]);
       }
 
-      // values of width/height attributes overwrite those extracted from viewbox attribute
-      width = widthAttr ? parseFloat(widthAttr) : width;
-      height = heightAttr ? parseFloat(heightAttr) : height;
+      if (viewBoxWidth && widthAttr && viewBoxWidth !== widthAttr) {
+        width = viewBoxWidth;
+        height = viewBoxHeight;
+      }
+      else {
+        // values of width/height attributes overwrite those extracted from viewbox attribute
+        width = widthAttr ? widthAttr : viewBoxWidth;
+        height = heightAttr ? heightAttr : viewBoxHeight;
+      }
 
       var options = {
         width: width,
-        height: height
+        height: height,
+        widthAttr: widthAttr,
+        heightAttr: heightAttr
       };
 
       fabric.gradientDefs = fabric.getGradientDefs(doc);
