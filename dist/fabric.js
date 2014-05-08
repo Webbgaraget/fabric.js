@@ -3082,6 +3082,7 @@ if (typeof console !== 'undefined') {
       };
 
       fabric.gradientDefs = fabric.getGradientDefs(doc);
+      fabric.clipPathDefs = fabric.getClipPathDefs(doc);
       fabric.cssRules = fabric.getCSSRules(doc);
 
       // Precedence of rules:   style > class > attribute
@@ -3208,6 +3209,63 @@ if (typeof console !== 'undefined') {
       }
 
       return gradientDefs;
+    },
+
+    /**
+     * Initializes clip paths on instances, according to clip paths parsed from a document
+     * @param {Array} instances
+     */
+    resolveClipPaths: function(instances) {
+      for (var i = instances.length; i--; ) {
+        var instanceClipPath = instances[i].get('clip-path');
+
+        if (!(/^url\(/).test(instanceClipPath)) continue;
+
+        var clipPathId = instanceClipPath.slice(5, instanceClipPath.length - 1);
+
+        if (fabric.clipPathDefs[clipPathId]) {
+          var el = fabric.clipPathDefs[clipPathId],
+              pathEls = el.getElementsByTagName('path'),
+              paths = [];
+
+          for (var p = pathEls.length; p--; ) {
+            fabric.Path.fromElement(pathEls[p], function (obj) {
+              obj.set('fill', 'rgba(0,0,0,0)');
+              paths.push(obj);
+
+              if (paths.length === pathEls.length) {
+                instances[i].clipTo = function (ctx) {
+                  for (var p = paths.length; p--; ) {
+                    paths[p].render(ctx, true);
+                  }
+                };
+              }
+            });
+          }
+        }
+        console.log('resolveClipPaths', instances[i]);
+      }
+    },
+
+    /**
+     * Parses an SVG document, returning all of the clipPath declarations found in it
+     * @static
+     * @function
+     * @memberOf fabric
+     * @param {SVGDocument} doc SVG document to parse
+     * @return {Object} clipPath definitions; key corresponds to element id, value -- to clipPath definition element
+     */
+    getClipPathDefs: function (doc) {
+      var clipPathEls = doc.getElementsByTagName('clipPath'),
+          el, i,
+          clipPathDefs = { };
+
+      i = clipPathEls.length;
+      for (; i--; ) {
+        el = clipPathEls[i];
+        clipPathDefs[el.getAttribute('id')] = el;
+      }
+      return clipPathDefs;
     },
 
     /**
@@ -3576,6 +3634,7 @@ fabric.ElementsParser.prototype.checkIfDone = function() {
       return el != null;
     });
     fabric.resolveGradients(this.instances);
+    fabric.resolveClipPaths(this.instances);
     this.callback(this.instances);
   }
 };
@@ -4512,7 +4571,6 @@ fabric.ElementsParser.prototype.checkIfDone = function() {
 
 })(typeof exports !== 'undefined' ? exports : this);
 
-
 (function() {
 
   /* _FROM_SVG_START_ */
@@ -4753,6 +4811,8 @@ fabric.ElementsParser.prototype.checkIfDone = function() {
       return gradient;
     }
   });
+
+
 
   fabric.util.object.extend(fabric.Gradient, {
 
@@ -8605,7 +8665,7 @@ fabric.PatternBrush = fabric.util.createClass(fabric.PencilBrush, /** @lends fab
 
       if (e.type === 'touchstart') {
         // Unbind mousedown to prevent double triggers from touch devices
-        removeListener(this.upperCanvasEl, 'mousedown', this._onMouseDown); 
+        removeListener(this.upperCanvasEl, 'mousedown', this._onMouseDown);
       }
       else {
         addListener(fabric.document, 'mouseup', this._onMouseUp);
@@ -15026,7 +15086,7 @@ fabric.util.object.extend(fabric.Object.prototype, /** @lends fabric.Object.prot
    * @memberOf fabric.Path
    * @see http://www.w3.org/TR/SVG/paths.html#PathElement
    */
-  fabric.Path.ATTRIBUTE_NAMES = fabric.SHARED_ATTRIBUTES.concat(['d']);
+  fabric.Path.ATTRIBUTE_NAMES = fabric.SHARED_ATTRIBUTES.concat(['d','clip-path']);
 
   /**
    * Creates an instance of fabric.Path from an SVG <path> element
